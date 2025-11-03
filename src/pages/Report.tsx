@@ -9,7 +9,7 @@ const SEVERITIES = ['Low','Medium','High','Critical'] as const
 
 type LatLng = { lat: number, lng: number }
 
-function LocationSelector({ value, onChange }: { value: LatLng | null, onChange: (v: LatLng) => void }) {
+function LocationSelector({ onChange }: { onChange: (v: LatLng) => void }) {
   useMapEvents({
     click(e) {
       onChange({ lat: e.latlng.lat, lng: e.latlng.lng })
@@ -198,7 +198,7 @@ export default function Report() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <LocationSelector value={location} onChange={setLocation} />
+            <LocationSelector onChange={setLocation} />
             <AutoCenter target={location} />
             {location && (
               <Marker position={[location.lat, location.lng]} icon={icon} />

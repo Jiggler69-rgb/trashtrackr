@@ -39,7 +39,9 @@ function App() {
       <main className="flex-1">
         <Outlet />
       </main>
-      <footer className="border-t text-xs text-gray-500 py-4 text-center">© {new Date().getFullYear()} TrashTrackr</footer>
+      <footer className="border-t text-xs text-gray-500 py-4 text-center">
+        © {new Date().getFullYear()} TrashTrackr · Made with <span aria-hidden="true" className="mx-1 text-red-500">&hearts;</span> by Shamant
+      </footer>
     </div>
   )
 }

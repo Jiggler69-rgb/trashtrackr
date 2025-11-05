@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -41,66 +41,91 @@ export default function Report() {
   const [severity, setSeverity] = useState<Severity>('Medium')
   const [location, setLocation] = useState<LatLng | null>(null)
   const [loading, setLoading] = useState(false)
-  const [locationError, setLocationError] = useState<string | null>(null)
+  const [locationMessage, setLocationMessage] = useState<string>('Waiting for location permission...')
+  const [locationHasError, setLocationHasError] = useState<boolean>(false)
   const { user, loading: authLoading, signIn } = useAuth()
 
   const icon = useSeverityIcon(severity)
 
-  useEffect(() => {
-    if (!('geolocation' in navigator)) {
-      setLocationError('Geolocation is not supported by your browser.')
-      return
-    }
+  const geoOptions = useMemo(() => ({ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }), [])
 
-    const geo = navigator.geolocation
-
-    const applyPosition = (pos: GeolocationPosition) => {
-      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-      if (!isWithinBangaloreRadius(coords)) {
-        setLocation(null)
-        setLocationError('Reports are limited to a 20 km radius around Bengaluru. Move closer to continue.')
-        return
-      }
-      setLocation(coords)
-      setLocationError(null)
-    }
-
-    const handleError = () => {
-      setLocation(null)
-      setLocationError('Enable location services to submit a report.')
-    }
-
-    const watchId = geo.watchPosition(applyPosition, handleError, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 10000,
-    })
-
-    return () => {
-      geo.clearWatch(watchId)
+  const describeGeolocationError = useCallback((error: GeolocationPositionError) => {
+    switch (error.code) {
+      case error.PERMISSION_DENIED:
+        return 'Location permission was denied. Enable it in your browser settings and try again.'
+      case error.POSITION_UNAVAILABLE:
+        return 'Location information is currently unavailable. Check GPS or network services.'
+      case error.TIMEOUT:
+        return 'Timed out while fetching your location. Move to an open area or try again.'
+      default:
+        return 'Unable to fetch your location automatically. Ensure location services are enabled.'
     }
   }, [])
 
-  const requestLocation = () => {
-    if (!('geolocation' in navigator)) {
-      setLocationError('Geolocation is not supported by your browser.')
+  const updateLocation = useCallback((coords: LatLng) => {
+    if (!isWithinBangaloreRadius(coords)) {
+      setLocation(null)
+      setLocationHasError(true)
+      setLocationMessage('Reports are limited to a 20 km radius around Bengaluru. Move closer to continue.')
       return
     }
-    navigator.geolocation.getCurrentPosition(
+    setLocation(coords)
+    setLocationHasError(false)
+    setLocationMessage('Location detected.')
+  }, [])
+
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setLocationHasError(true)
+      setLocationMessage('Geolocation is not supported by your browser or device.')
+      return
+    }
+
+    let cancelled = false
+    const geo = navigator.geolocation
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      if (cancelled) return
+      updateLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+    }
+
+    const onError = (error: GeolocationPositionError) => {
+      if (cancelled) return
+      setLocation(null)
+      setLocationHasError(true)
+      setLocationMessage(describeGeolocationError(error))
+    }
+
+    setLocationMessage('Requesting your current position...')
+    setLocationHasError(false)
+    geo.getCurrentPosition(onSuccess, onError, geoOptions)
+    const watchId = geo.watchPosition(onSuccess, onError, geoOptions)
+
+    return () => {
+      cancelled = true
+      geo.clearWatch(watchId)
+    }
+  }, [describeGeolocationError, geoOptions, updateLocation])
+
+  const requestLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setLocationHasError(true)
+      setLocationMessage('Geolocation is not supported by your browser or device.')
+      return
+    }
+    const geo = navigator.geolocation
+    setLocationMessage('Trying to refresh your location...')
+    setLocationHasError(false)
+    geo.getCurrentPosition(
       (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        if (!isWithinBangaloreRadius(coords)) {
-          setLocation(null)
-          setLocationError('Reports are limited to a 20 km radius around Bengaluru. Move closer to continue.')
-          return
-        }
-        setLocation(coords)
-        setLocationError(null)
+        updateLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
       },
-      () => {
-        setLocationError('Enable location services to submit a report.')
+      (error) => {
+        setLocation(null)
+        setLocationHasError(true)
+        setLocationMessage(describeGeolocationError(error))
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      geoOptions
     )
   }
 
@@ -191,15 +216,15 @@ export default function Report() {
                 onClick={requestLocation}
               >Refresh location</button>
             </div>
-            <p className="mt-2 text-xs text-gray-500">Allow location access so we can map the trash spot automatically (within 20 km of Bengaluru).</p>
+            <p className="mt-2 text-xs text-gray-500">Allow location access so we can map the trash spot automatically (must be within 20 km of Bengaluru).</p>
             {location ? (
               <p className="mt-3 text-sm text-gray-600">Lat {location.lat.toFixed(5)}, Lng {location.lng.toFixed(5)}</p>
             ) : (
-              <p className="mt-3 text-sm text-red-500">{locationError ?? 'Requesting location...'}</p>
+              <p className={`mt-3 text-sm ${locationHasError ? 'text-red-500' : 'text-gray-500'}`}>{locationMessage}</p>
             )}
           </div>
 
-          <button disabled={loading || !location || !!locationError || !user} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
+          <button disabled={loading || !location || locationHasError || !user} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
           >
             {loading ? 'Submitting...' : user ? 'Submit Report' : 'Sign in to submit'}
           </button>

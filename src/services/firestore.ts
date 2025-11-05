@@ -1,5 +1,4 @@
-import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore'
-import type { Timestamp } from 'firebase/firestore'
+import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore'
 import { getAuth } from 'firebase/auth'
 import { isWithinBangaloreRadius } from '../utils/geo'
 import { app } from './firebase'
@@ -57,25 +56,42 @@ export function listenToReports(cb: (docs: ReportRecord[]) => void) {
   const q = query(ref, orderBy('createdAt', 'desc'))
   return onSnapshot(q, (snap) => {
     const docs = snap.docs
-      .map((doc) => {
+      .map((doc): ReportRecord | null => {
         const data = doc.data()
         const location = data.location ?? {}
         if (typeof location.lat !== 'number' || typeof location.lng !== 'number') {
           return null
         }
+
         const severity = ALLOWED_SEVERITIES.includes(data.severity as Severity)
           ? (data.severity as Severity)
           : 'Medium'
+
         const types = Array.isArray(data.types)
-          ? data.types.filter((t): t is string => typeof t === 'string')
+          ? data.types.filter((value): value is string => typeof value === 'string')
           : []
+
+        const rawCreatedBy = data.createdBy
+        const createdBy =
+          rawCreatedBy && typeof rawCreatedBy === 'object'
+            ? {
+                uid: typeof rawCreatedBy.uid === 'string' ? rawCreatedBy.uid : 'unknown',
+                displayName: typeof rawCreatedBy.displayName === 'string' ? rawCreatedBy.displayName : null,
+                email: typeof rawCreatedBy.email === 'string' ? rawCreatedBy.email : null,
+                photoURL: typeof rawCreatedBy.photoURL === 'string' ? rawCreatedBy.photoURL : null,
+              }
+            : undefined
+
+        const createdAtValue = data.createdAt
+        const createdAt = createdAtValue instanceof Timestamp ? createdAtValue : null
+
         return {
           id: doc.id,
           types,
           severity,
           location: { lat: location.lat, lng: location.lng },
-          createdAt: (data.createdAt ?? null) as Timestamp | null,
-          createdBy: typeof data.createdBy === 'object' ? data.createdBy : undefined,
+          createdAt,
+          createdBy,
         }
       })
       .filter((item): item is ReportRecord => item !== null)

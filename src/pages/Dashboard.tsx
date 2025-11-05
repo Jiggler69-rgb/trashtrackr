@@ -80,8 +80,7 @@ export default function Dashboard() {
         const icon = createSeverityIcon(r.severity)
         const marker = L.marker([r.location.lat, r.location.lng] as LatLngExpression, { icon })
         const time = r.createdAt ? r.createdAt.toDate() : new Date()
-        const reporter = r.createdBy?.displayName || r.createdBy?.email || 'Anonymous'
-        marker.bindPopup(`<div><div class="text-sm font-medium">${r.types.join(', ')}</div><div class="text-xs mt-1">Severity: ${r.severity}</div><div class="text-xs text-gray-500 mt-1">${time.toLocaleString()}</div><div class="text-xs text-gray-500 mt-1">Reported by: ${reporter}</div></div>`)
+        marker.bindPopup(`<div><div class="text-sm font-medium">${r.types.join(', ')}</div><div class="text-xs mt-1">Severity: ${r.severity}</div><div class="text-xs text-gray-500 mt-1">${time.toLocaleString()}</div></div>`)
         layer.addLayer(marker)
       })
     }, [points, layer])

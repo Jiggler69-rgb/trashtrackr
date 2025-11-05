@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore'
+import { isWithinKarnataka } from '../utils/geo'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,6 +22,9 @@ export type NewReport = {
 
 export async function addReport(data: NewReport) {
   const ref = collection(db, 'reports')
+  if (!isWithinKarnataka(data.location)) {
+    throw new Error('Location must be within Karnataka')
+  }
   await addDoc(ref, {
     ...data,
     createdAt: serverTimestamp(),

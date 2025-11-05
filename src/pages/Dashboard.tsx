@@ -5,6 +5,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
 import type { LatLngExpression } from 'leaflet'
+import { isWithinKarnataka } from '../utils/geo'
 import 'leaflet.markercluster'
 import toast, { Toaster } from 'react-hot-toast'
 
@@ -33,7 +34,10 @@ export default function Dashboard() {
     async function sub() {
       try {
         const { listenToReports } = await import('../services/firestore')
-        return listenToReports((docs) => setReports(docs))
+        return listenToReports((docs) => {
+          const filteredDocs = docs.filter((doc) => isWithinKarnataka((doc as any)?.location))
+          setReports(filteredDocs)
+        })
       } catch (e) {
         toast.error('Failed to load reports')
       }

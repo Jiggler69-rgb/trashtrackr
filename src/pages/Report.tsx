@@ -3,6 +3,7 @@ import toast, { Toaster } from 'react-hot-toast'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { isWithinKarnataka } from '../utils/geo'
 
 const WASTE_TYPES = ['Plastic','Organic','E-Waste','Metal','Construction','Paper','Other'] as const
 const SEVERITIES = ['Low','Medium','High','Critical'] as const
@@ -50,8 +51,14 @@ export default function Report() {
 
     const geo = navigator.geolocation
 
-    const handleSuccess = (pos: GeolocationPosition) => {
-      setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+    const applyPosition = (pos: GeolocationPosition) => {
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      if (!isWithinKarnataka(coords)) {
+        setLocation(null)
+        setLocationError('Reports are limited to Karnataka. Move within the state to continue.')
+        return
+      }
+      setLocation(coords)
       setLocationError(null)
     }
 
@@ -60,7 +67,7 @@ export default function Report() {
       setLocationError('Enable location services to submit a report.')
     }
 
-    const watchId = geo.watchPosition(handleSuccess, handleError, {
+    const watchId = geo.watchPosition(applyPosition, handleError, {
       enableHighAccuracy: true,
       maximumAge: 0,
       timeout: 10000,
@@ -78,7 +85,13 @@ export default function Report() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        if (!isWithinKarnataka(coords)) {
+          setLocation(null)
+          setLocationError('Reports are limited to Karnataka. Move within the state to continue.')
+          return
+        }
+        setLocation(coords)
         setLocationError(null)
       },
       () => {
@@ -96,7 +109,7 @@ export default function Report() {
     e.preventDefault()
     if (selectedTypes.length === 0) return toast.error('Select at least one waste type')
     if (!SEVERITIES.includes(severity as any)) return toast.error('Select a severity')
-    if (!location) return toast.error('Enable location services to submit a report')
+    if (!location || !isWithinKarnataka(location)) return toast.error('Enable location services within Karnataka to submit a report')
 
     try {
       setLoading(true)
@@ -165,7 +178,7 @@ export default function Report() {
             )}
           </div>
 
-          <button disabled={loading || !location} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
+          <button disabled={loading || !location || !!locationError} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
           >
             {loading ? 'Submitting...' : 'Submit Report'}
           </button>

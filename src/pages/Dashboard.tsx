@@ -5,7 +5,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
 import type { LatLngExpression } from 'leaflet'
-import { isWithinKarnataka } from '../utils/geo'
+import { isWithinBangaloreRadius, BANGALORE_CENTER } from '../utils/geo'
 import 'leaflet.markercluster'
 import toast, { Toaster } from 'react-hot-toast'
 
@@ -35,7 +35,7 @@ export default function Dashboard() {
       try {
         const { listenToReports } = await import('../services/firestore')
         return listenToReports((docs) => {
-          const filteredDocs = docs.filter((doc) => isWithinKarnataka((doc as any)?.location))
+          const filteredDocs = docs.filter((doc) => isWithinBangaloreRadius((doc as any)?.location))
           setReports(filteredDocs)
         })
       } catch (e) {
@@ -114,7 +114,7 @@ export default function Dashboard() {
         >Export CSV</button>
       </aside>
       <div className="flex-1 h-[calc(100vh-64px)]">
-        <MapContainer center={[12.9716,77.5946]} zoom={12} style={{ height: '100%', width: '100%' }}>
+        <MapContainer center={[BANGALORE_CENTER.lat, BANGALORE_CENTER.lng]} zoom={12} style={{ height: '100%', width: '100%' }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

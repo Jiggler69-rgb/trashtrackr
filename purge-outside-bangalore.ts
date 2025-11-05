@@ -3,7 +3,7 @@ import { getFirestore, collection, getDocs, deleteDoc, doc } from 'firebase/fire
 import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { isWithinKarnataka, normalizeLatLng } from './src/utils/geo'
+import { isWithinBangaloreRadius, normalizeLatLng, BANGALORE_CENTER, BANGALORE_RADIUS_KM } from './src/utils/geo'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -21,8 +21,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 
-async function purgeOutsideKarnataka() {
-  console.log('🔍 Checking reports outside Karnataka bounds...')
+async function purgeOutsideBangalore() {
+  console.log(`🔍 Checking reports outside a ${BANGALORE_RADIUS_KM} km radius around Bengaluru (${BANGALORE_CENTER.lat.toFixed(4)}, ${BANGALORE_CENTER.lng.toFixed(4)})...`)
 
   const reportsRef = collection(db, 'reports')
   const snapshot = await getDocs(reportsRef)
@@ -35,15 +35,15 @@ async function purgeOutsideKarnataka() {
   const candidates = snapshot.docs.filter((docSnap) => {
     const data = docSnap.data()
     const coords = normalizeLatLng(data?.location)
-    return !isWithinKarnataka(coords || undefined)
+    return !isWithinBangaloreRadius(coords || undefined)
   })
 
   if (candidates.length === 0) {
-    console.log('✅ All reports are within Karnataka.')
+    console.log('✅ All reports are within the Bengaluru service radius.')
     return
   }
 
-  console.log(`Found ${candidates.length} reports outside Karnataka. Deleting...`)
+  console.log(`Found ${candidates.length} reports outside the service radius. Deleting...`)
   let deleted = 0
   for (const docSnap of candidates) {
     await deleteDoc(doc(db, 'reports', docSnap.id))
@@ -51,10 +51,10 @@ async function purgeOutsideKarnataka() {
     console.log(`🗑️  Deleted ${deleted}/${candidates.length} (${docSnap.id})`)
   }
 
-  console.log('🎉 Finished removing out-of-state reports.')
+  console.log('🎉 Finished removing out-of-radius reports.')
 }
 
-purgeOutsideKarnataka().catch((err) => {
+purgeOutsideBangalore().catch((err) => {
   console.error('❌ Failed to purge reports:', err)
   process.exitCode = 1
 })

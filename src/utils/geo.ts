@@ -8,10 +8,12 @@ export type LatLng = {
   lng: number
 }
 
-export const KARNATAKA_BOUNDS = Object.freeze({
-  lat: { min: 11.5, max: 18.8 },
-  lng: { min: 74.0, max: 78.7 },
+export const BANGALORE_CENTER = Object.freeze({
+  lat: 12.9715987,
+  lng: 77.5945627,
 })
+
+export const BANGALORE_RADIUS_KM = 20
 
 export function normalizeLatLng(value: LatLngLike | null | undefined): LatLng | null {
   if (!value || value.lat == null || value.lng == null) return null
@@ -21,15 +23,28 @@ export function normalizeLatLng(value: LatLngLike | null | undefined): LatLng | 
   return { lat, lng }
 }
 
-export function isWithinKarnataka(value: LatLngLike | null | undefined): value is LatLng {
+function toRadians(deg: number) {
+  return (deg * Math.PI) / 180
+}
+
+export function distanceInKm(a: LatLng, b: LatLng): number {
+  const R = 6371 // Earth radius in km
+  const dLat = toRadians(b.lat - a.lat)
+  const dLng = toRadians(b.lng - a.lng)
+  const lat1 = toRadians(a.lat)
+  const lat2 = toRadians(b.lat)
+
+  const sinDLat = Math.sin(dLat / 2)
+  const sinDLng = Math.sin(dLng / 2)
+
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))
+  return R * c
+}
+
+export function isWithinBangaloreRadius(value: LatLngLike | null | undefined): value is LatLng {
   const coords = normalizeLatLng(value)
   if (!coords) return false
-  const { lat, lng } = coords
-  return (
-    lat >= KARNATAKA_BOUNDS.lat.min &&
-    lat <= KARNATAKA_BOUNDS.lat.max &&
-    lng >= KARNATAKA_BOUNDS.lng.min &&
-    lng <= KARNATAKA_BOUNDS.lng.max
-  )
+  return distanceInKm(coords, BANGALORE_CENTER) <= BANGALORE_RADIUS_KM
 }
 

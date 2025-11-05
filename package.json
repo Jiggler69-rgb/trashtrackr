@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "upload-fake-data": "tsx upload-fake-data.ts",
     "delete-fake-data": "tsx delete-fake-data.ts",
-    "purge-outside-karnataka": "tsx purge-outside-karnataka.ts"
+    "purge-outside-bangalore": "tsx purge-outside-bangalore.ts"
   },
   "dependencies": {
     "firebase": "^12.3.0",

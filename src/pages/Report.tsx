@@ -3,7 +3,7 @@ import toast, { Toaster } from 'react-hot-toast'
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { isWithinKarnataka } from '../utils/geo'
+import { isWithinBangaloreRadius, BANGALORE_CENTER } from '../utils/geo'
 
 const WASTE_TYPES = ['Plastic','Organic','E-Waste','Metal','Construction','Paper','Other'] as const
 const SEVERITIES = ['Low','Medium','High','Critical'] as const
@@ -53,9 +53,9 @@ export default function Report() {
 
     const applyPosition = (pos: GeolocationPosition) => {
       const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-      if (!isWithinKarnataka(coords)) {
+      if (!isWithinBangaloreRadius(coords)) {
         setLocation(null)
-        setLocationError('Reports are limited to Karnataka. Move within the state to continue.')
+        setLocationError('Reports are limited to a 20 km radius around Bengaluru. Move closer to continue.')
         return
       }
       setLocation(coords)
@@ -86,9 +86,9 @@ export default function Report() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        if (!isWithinKarnataka(coords)) {
+        if (!isWithinBangaloreRadius(coords)) {
           setLocation(null)
-          setLocationError('Reports are limited to Karnataka. Move within the state to continue.')
+          setLocationError('Reports are limited to a 20 km radius around Bengaluru. Move closer to continue.')
           return
         }
         setLocation(coords)
@@ -109,7 +109,7 @@ export default function Report() {
     e.preventDefault()
     if (selectedTypes.length === 0) return toast.error('Select at least one waste type')
     if (!SEVERITIES.includes(severity as any)) return toast.error('Select a severity')
-    if (!location || !isWithinKarnataka(location)) return toast.error('Enable location services within Karnataka to submit a report')
+    if (!location || !isWithinBangaloreRadius(location)) return toast.error('Enable location services within 20 km of Bengaluru to submit a report')
 
     try {
       setLoading(true)
@@ -170,7 +170,7 @@ export default function Report() {
                 onClick={requestLocation}
               >Refresh location</button>
             </div>
-            <p className="mt-2 text-xs text-gray-500">Allow location access so we can map the trash spot automatically.</p>
+            <p className="mt-2 text-xs text-gray-500">Allow location access so we can map the trash spot automatically (within 20 km of Bengaluru).</p>
             {location ? (
               <p className="mt-3 text-sm text-gray-600">Lat {location.lat.toFixed(5)}, Lng {location.lng.toFixed(5)}</p>
             ) : (
@@ -185,7 +185,7 @@ export default function Report() {
         </div>
 
         <div className="h-[360px] sm:h-[420px] md:h-[520px] rounded-xl border shadow-sm overflow-hidden">
-          <MapContainer center={location ? [location.lat, location.lng] : [12.9716, 77.5946]} zoom={location ? 14 : 12} style={{ height: '100%', width: '100%' }}>
+          <MapContainer center={location ? [location.lat, location.lng] : [BANGALORE_CENTER.lat, BANGALORE_CENTER.lng]} zoom={location ? 14 : 12} style={{ height: '100%', width: '100%' }}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

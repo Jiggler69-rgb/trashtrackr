@@ -1,6 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isValidReport(data) {
+      return data.keys().hasOnly(['types', 'severity', 'location', 'createdAt', 'createdBy'])
+        && data.types is list
+        && data.types.size() > 0
+        && data.types.size() <= 10
+        && data.types.all(t, t is string && t.size() > 0 && t.size() <= 80)
+        && data.severity is string
+        && data.severity in ['Low', 'Medium', 'High', 'Critical']
+        && data.location is map
+        && data.location.keys().hasOnly(['lat', 'lng'])
+        && data.location.lat is number
+        && data.location.lng is number
+        && data.createdAt == request.time
+        && data.createdBy is map
+        && data.createdBy.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL'])
+        && data.createdBy.uid == request.auth.uid
+        && (!('displayName' in data.createdBy) || data.createdBy.displayName == null || data.createdBy.displayName is string)
+        && (!('email' in data.createdBy) || data.createdBy.email == null || data.createdBy.email is string)
+        && (!('photoURL' in data.createdBy) || data.createdBy.photoURL == null || data.createdBy.photoURL is string);
+    }
+
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.token.email_verified == true && isValidReport(request.resource.data);
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if true;
     }

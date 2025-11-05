@@ -22,9 +22,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 
-// Bangalore coordinates - approximate center
-const BANGALORE_CENTER = { lat: 12.9716, lng: 77.5946 }
-
 // Common trash types
 const trashTypes = [
   ['Plastic bottles', 'Food waste'],
@@ -38,9 +35,6 @@ const trashTypes = [
   ['Organic waste'],
   ['Mixed waste', 'Plastic'],
 ]
-
-// Severity levels
-const severities = ['Low', 'Medium', 'High', 'Critical']
 
 // Famous areas in Bangalore for more realistic data
 const bangaloreAreas = [

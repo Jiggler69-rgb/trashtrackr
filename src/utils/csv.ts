@@ -1,14 +1,19 @@
 import Papa from 'papaparse'
+import type { ReportRecord } from '../services/firestore'
 
-export function exportToCsv(filename: string, rows: any[]) {
-  const data = rows.map(r => ({
-    id: r.id,
-    types: Array.isArray(r.types) ? r.types.join('|') : '',
-    severity: r.severity,
-    lat: r.location?.lat,
-    lng: r.location?.lng,
-    createdAt: (r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt || Date.now())).toISOString(),
-  }))
+export function exportToCsv(filename: string, rows: ReportRecord[]) {
+  const data = rows.map((r) => {
+    const createdAtDate = r.createdAt ? r.createdAt.toDate() : null
+    return {
+      id: r.id,
+      types: Array.isArray(r.types) ? r.types.join('|') : '',
+      severity: r.severity,
+      lat: r.location.lat,
+      lng: r.location.lng,
+      createdAt: createdAtDate ? createdAtDate.toISOString() : '',
+      reporter: r.createdBy?.displayName || r.createdBy?.email || '',
+    }
+  })
   const csv = Papa.unparse(data)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)

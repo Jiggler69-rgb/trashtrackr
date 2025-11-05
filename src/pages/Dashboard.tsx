@@ -8,14 +8,9 @@ import type { LatLngExpression } from 'leaflet'
 import { isWithinBangaloreRadius, BANGALORE_CENTER } from '../utils/geo'
 import 'leaflet.markercluster'
 import toast, { Toaster } from 'react-hot-toast'
+import type { ReportRecord } from '../services/firestore'
 
-type ReportDoc = {
-  id: string
-  types: string[]
-  severity: 'Low' | 'Medium' | 'High' | 'Critical'
-  location: { lat: number, lng: number }
-  createdAt?: any
-}
+type ReportDoc = ReportRecord
 
 function createSeverityIcon(severity: string) {
   const color = severity === 'Critical' ? '#ef4444' : severity === 'High' ? '#f97316' : severity === 'Medium' ? '#eab308' : '#22c55e'
@@ -35,16 +30,21 @@ export default function Dashboard() {
       try {
         const { listenToReports } = await import('../services/firestore')
         return listenToReports((docs) => {
-          const filteredDocs = docs.filter((doc) => isWithinBangaloreRadius((doc as any)?.location))
+          const filteredDocs = docs.filter((doc) => isWithinBangaloreRadius(doc.location))
           setReports(filteredDocs)
         })
-      } catch (e) {
+      } catch (error) {
+        console.error(error)
         toast.error('Failed to load reports')
       }
     }
     const unsubPromise = sub()
     return () => {
-      Promise.resolve(unsubPromise).then((u: any) => { if (typeof u === 'function') u() })
+      Promise.resolve(unsubPromise).then((unsubscribe) => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe()
+        }
+      })
     }
   }, [])
 
@@ -66,7 +66,11 @@ export default function Dashboard() {
     useEffect(() => {
       map.addLayer(layer)
       return () => {
-        try { map.removeLayer(layer) } catch {}
+        try {
+          map.removeLayer(layer)
+        } catch (error) {
+          console.error('Failed to remove marker layer', error)
+        }
       }
     }, [map, layer])
 
@@ -75,8 +79,9 @@ export default function Dashboard() {
       points.forEach((r) => {
         const icon = createSeverityIcon(r.severity)
         const marker = L.marker([r.location.lat, r.location.lng] as LatLngExpression, { icon })
-        const time = r.createdAt?.toDate ? r.createdAt.toDate() : new Date(r.createdAt || Date.now())
-        marker.bindPopup(`<div><div class="text-sm font-medium">${r.types.join(', ')}</div><div class="text-xs mt-1">Severity: ${r.severity}</div><div class="text-xs text-gray-500 mt-1">${time.toLocaleString()}</div></div>`)
+        const time = r.createdAt ? r.createdAt.toDate() : new Date()
+        const reporter = r.createdBy?.displayName || r.createdBy?.email || 'Anonymous'
+        marker.bindPopup(`<div><div class="text-sm font-medium">${r.types.join(', ')}</div><div class="text-xs mt-1">Severity: ${r.severity}</div><div class="text-xs text-gray-500 mt-1">${time.toLocaleString()}</div><div class="text-xs text-gray-500 mt-1">Reported by: ${reporter}</div></div>`)
         layer.addLayer(marker)
       })
     }, [points, layer])

@@ -4,9 +4,11 @@ import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { isWithinBangaloreRadius, BANGALORE_CENTER } from '../utils/geo'
+import { useAuth } from '../hooks/useAuth'
+import type { Severity } from '../services/firestore'
 
 const WASTE_TYPES = ['Plastic','Organic','E-Waste','Metal','Construction','Paper','Other'] as const
-const SEVERITIES = ['Low','Medium','High','Critical'] as const
+const SEVERITIES: Severity[] = ['Low','Medium','High','Critical']
 
 type LatLng = { lat: number, lng: number }
 
@@ -36,10 +38,11 @@ function AutoCenter({ target }: { target: LatLng | null }) {
 
 export default function Report() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
-  const [severity, setSeverity] = useState<string>('Medium')
+  const [severity, setSeverity] = useState<Severity>('Medium')
   const [location, setLocation] = useState<LatLng | null>(null)
   const [loading, setLoading] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
+  const { user, loading: authLoading, signIn } = useAuth()
 
   const icon = useSeverityIcon(severity)
 
@@ -107,8 +110,12 @@ export default function Report() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!user) {
+      toast.error('Sign in with Google to submit a report')
+      return
+    }
     if (selectedTypes.length === 0) return toast.error('Select at least one waste type')
-    if (!SEVERITIES.includes(severity as any)) return toast.error('Select a severity')
+    if (!SEVERITIES.includes(severity)) return toast.error('Select a severity')
     if (!location || !isWithinBangaloreRadius(location)) return toast.error('Enable location services within 20 km of Bengaluru to submit a report')
 
     try {
@@ -118,7 +125,8 @@ export default function Report() {
       toast.success('Report submitted')
       setSelectedTypes([])
       setSeverity('Medium')
-    } catch (err) {
+    } catch (error) {
+      console.error(error)
       toast.error('Failed to submit')
     } finally {
       setLoading(false)
@@ -129,6 +137,19 @@ export default function Report() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <Toaster />
       <h1 className="text-2xl font-semibold">Report Trash</h1>
+      {!authLoading && !user && (
+        <div className="mt-6 rounded-xl border border-yellow-300 bg-yellow-50 p-5">
+          <h2 className="text-lg font-medium mb-1">Sign in required</h2>
+          <p className="text-sm text-yellow-800 mb-4">Please sign in with your Google account before submitting trash reports.</p>
+          <button
+            type="button"
+            onClick={() => signIn()}
+            className="px-4 py-2 rounded-md bg-black text-white text-sm"
+          >
+            Sign in with Google
+          </button>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
           <div className="rounded-xl border shadow-sm p-4">
@@ -178,9 +199,9 @@ export default function Report() {
             )}
           </div>
 
-          <button disabled={loading || !location || !!locationError} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
+          <button disabled={loading || !location || !!locationError || !user} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
           >
-            {loading ? 'Submitting...' : 'Submit Report'}
+            {loading ? 'Submitting...' : user ? 'Submit Report' : 'Sign in to submit'}
           </button>
         </div>
 

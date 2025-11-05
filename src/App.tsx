@@ -1,8 +1,47 @@
 import { Link, Outlet } from 'react-router-dom'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useAuth } from './hooks/useAuth'
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { user, loading, signIn, signOut } = useAuth()
+
+  const authButton = useMemo(() => {
+    if (loading) {
+      return (
+        <span className="text-xs text-gray-500" aria-live="polite">
+          Checking session...
+        </span>
+      )
+    }
+    if (user) {
+      return (
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border bg-white/60 hover:bg-gray-100"
+          onClick={() => signOut()}
+        >
+          {user.photoURL ? (
+            <img src={user.photoURL} alt={user.displayName ?? 'Signed in user'} className="h-6 w-6 rounded-full" />
+          ) : (
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-700">
+              {(user.displayName ?? user.email ?? '?').charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span>Sign out</span>
+        </button>
+      )
+    }
+    return (
+      <button
+        type="button"
+        className="text-sm px-3 py-1.5 rounded-md border bg-black text-white hover:bg-gray-900"
+        onClick={() => signIn()}
+      >
+        Sign in with Google
+      </button>
+    )
+  }, [loading, signIn, signOut, user])
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
       <header className="sticky top-0 z-20 bg-white/70 backdrop-blur border-b">
@@ -11,11 +50,14 @@ function App() {
             <img src="/logo.png" alt="TrashTrackr logo" className="h-6 w-6" />
             <span>TrashTrackr</span>
           </Link>
-          <nav className="hidden sm:flex items-center gap-1 text-sm p-1 rounded-lg border bg-white/60">
-            <Link className="px-3 py-1.5 rounded-md hover:bg-gray-100" to="/">Home</Link>
-            <Link className="px-3 py-1.5 rounded-md hover:bg-gray-100" to="/report">Report</Link>
-            <Link className="px-3 py-1.5 rounded-md hover:bg-gray-100" to="/dashboard">Dashboard</Link>
-          </nav>
+          <div className="hidden sm:flex items-center gap-3">
+            <nav className="flex items-center gap-1 text-sm p-1 rounded-lg border bg-white/60">
+              <Link className="px-3 py-1.5 rounded-md hover:bg-gray-100" to="/">Home</Link>
+              <Link className="px-3 py-1.5 rounded-md hover:bg-gray-100" to="/report">Report</Link>
+              <Link className="px-3 py-1.5 rounded-md hover:bg-gray-100" to="/dashboard">Dashboard</Link>
+            </nav>
+            {authButton}
+          </div>
           <button
             className="sm:hidden inline-flex items-center justify-center w-9 h-9 rounded-md border bg-white/70"
             aria-label="Menu"
@@ -32,6 +74,9 @@ function App() {
               <Link className="px-3 py-2 rounded hover:bg-gray-50" to="/" onClick={()=>setMenuOpen(false)}>Home</Link>
               <Link className="px-3 py-2 rounded hover:bg-gray-50" to="/report" onClick={()=>setMenuOpen(false)}>Report</Link>
               <Link className="px-3 py-2 rounded hover:bg-gray-50" to="/dashboard" onClick={()=>setMenuOpen(false)}>Dashboard</Link>
+              <div className="mt-3 border-t pt-3">
+                {authButton}
+              </div>
             </div>
           </div>
         )}

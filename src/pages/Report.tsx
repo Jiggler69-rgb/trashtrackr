@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -8,15 +8,6 @@ const WASTE_TYPES = ['Plastic','Organic','E-Waste','Metal','Construction','Paper
 const SEVERITIES = ['Low','Medium','High','Critical'] as const
 
 type LatLng = { lat: number, lng: number }
-
-function LocationSelector({ onChange }: { onChange: (v: LatLng) => void }) {
-  useMapEvents({
-    click(e) {
-      onChange({ lat: e.latlng.lat, lng: e.latlng.lng })
-    }
-  })
-  return null
-}
 
 function useSeverityIcon(severity: string) {
   return useMemo(() => {
@@ -42,65 +33,70 @@ function AutoCenter({ target }: { target: LatLng | null }) {
   return null
 }
 
-function clampLatLng(input: LatLng): LatLng {
-  const lat = Math.max(-90, Math.min(90, input.lat))
-  let lng = input.lng
-  if (lng < -180 || lng > 180) {
-    lng = ((lng + 180) % 360 + 360) % 360 - 180
-  }
-  return { lat, lng }
-}
-
 export default function Report() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const [severity, setSeverity] = useState<string>('Medium')
   const [location, setLocation] = useState<LatLng | null>(null)
   const [loading, setLoading] = useState(false)
-  const [latStr, setLatStr] = useState<string>('')
-  const [lngStr, setLngStr] = useState<string>('')
+  const [locationError, setLocationError] = useState<string | null>(null)
 
   const icon = useSeverityIcon(severity)
 
   useEffect(() => {
-    // Try to center map using geolocation but don't block
-    if (!('geolocation' in navigator)) return
+    if (!('geolocation' in navigator)) {
+      setLocationError('Geolocation is not supported by your browser.')
+      return
+    }
+
+    const geo = navigator.geolocation
+
+    const handleSuccess = (pos: GeolocationPosition) => {
+      setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      setLocationError(null)
+    }
+
+    const handleError = () => {
+      setLocation(null)
+      setLocationError('Enable location services to submit a report.')
+    }
+
+    const watchId = geo.watchPosition(handleSuccess, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000,
+    })
+
+    return () => {
+      geo.clearWatch(watchId)
+    }
+  }, [])
+
+  const requestLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setLocationError('Geolocation is not supported by your browser.')
+      return
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setLocationError(null)
       },
-      () => {},
-      { enableHighAccuracy: true, timeout: 5000 }
+      () => {
+        setLocationError('Enable location services to submit a report.')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     )
-  }, [])
+  }
 
   const toggleType = (t: string) => {
     setSelectedTypes((prev) => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
-  }
-
-  useEffect(() => {
-    if (location) {
-      setLatStr(location.lat.toFixed(6))
-      setLngStr(location.lng.toFixed(6))
-    }
-  }, [location])
-
-  function applyManualLocation() {
-    const lat = parseFloat(latStr)
-    const lng = parseFloat(lngStr)
-    if (Number.isNaN(lat) || Number.isNaN(lng)) {
-      toast.error('Enter valid latitude and longitude')
-      return
-    }
-    const clamped = clampLatLng({ lat, lng })
-    setLocation(clamped)
-    toast.success('Location set')
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (selectedTypes.length === 0) return toast.error('Select at least one waste type')
     if (!SEVERITIES.includes(severity as any)) return toast.error('Select a severity')
-    if (!location) return toast.error('Select a location')
+    if (!location) return toast.error('Enable location services to submit a report')
 
     try {
       setLoading(true)
@@ -153,40 +149,23 @@ export default function Report() {
           </div>
 
           <div className="rounded-xl border shadow-sm p-4">
-            <label className="block text-sm font-medium mb-3">Coordinates (optional)</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                value={latStr}
-                onChange={(e)=>setLatStr(e.target.value)}
-                inputMode="decimal"
-                placeholder="Latitude (e.g. 12.9716)"
-                className="w-full border rounded px-3 py-2"
-              />
-              <input
-                value={lngStr}
-                onChange={(e)=>setLngStr(e.target.value)}
-                inputMode="decimal"
-                placeholder="Longitude (e.g. 77.5946)"
-                className="w-full border rounded px-3 py-2"
-              />
+            <div className="flex items-center justify-between">
+              <span className="block text-sm font-medium">Location</span>
+              <button
+                type="button"
+                className="px-3 py-2 border rounded-md text-xs"
+                onClick={requestLocation}
+              >Refresh location</button>
             </div>
-            <button type="button" onClick={applyManualLocation} className="mt-3 px-3 py-2 border rounded-md">Set location</button>
-            <p className="mt-2 text-xs text-gray-500">Tip: You can also click on the map to pick a location.</p>
+            <p className="mt-2 text-xs text-gray-500">Allow location access so we can map the trash spot automatically.</p>
+            {location ? (
+              <p className="mt-3 text-sm text-gray-600">Lat {location.lat.toFixed(5)}, Lng {location.lng.toFixed(5)}</p>
+            ) : (
+              <p className="mt-3 text-sm text-red-500">{locationError ?? 'Requesting location...'}</p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
-            <button type="button" className="px-3 py-2 border rounded-md" onClick={() => {
-              if (!('geolocation' in navigator)) return toast.error('Geolocation not available')
-              navigator.geolocation.getCurrentPosition(
-                (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                () => toast.error('Failed to get location'),
-                { enableHighAccuracy: true, timeout: 7000 }
-              )
-            }}>Use my location</button>
-            <button type="button" className="px-3 py-2 border rounded-md" onClick={() => setLocation(null)}>Clear location</button>
-          </div>
-
-          <button disabled={loading} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
+          <button disabled={loading || !location} type="submit" className="w-full sm:w-auto px-4 py-2 rounded-md bg-black text-white disabled:opacity-50"
           >
             {loading ? 'Submitting...' : 'Submit Report'}
           </button>
@@ -198,7 +177,6 @@ export default function Report() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <LocationSelector onChange={setLocation} />
             <AutoCenter target={location} />
             {location && (
               <Marker position={[location.lat, location.lng]} icon={icon} />
